@@ -103,24 +103,18 @@ AtlasElement = Struct(
 )
 
 AtlasSource = Struct(
+    "alId" / Int32ul,
     "slCount" / Int8ul,
-    Array(this.slCount, Struct(
+    "sourceInfo" / Array(this.slCount, Struct(
         "source" / GAFString,
         "contentScale" / Float32l,
     )),
-    "p" / Probe(),
 )
-
-AtlasMember = Struct(
-      "alId" / Int32ul,
-      "slMember" / AtlasSource[1:2]
-    )
-
 
 atlas = Struct(
     "displayScale" / Float32l,
     "alCount" / Int8ul,
-    "alMember" / AtlasMember[this.alCount],
+    "alSources" / AtlasSource[this.alCount],
     "elCount" / Int32ul,
     "elContent" / AtlasElement[this.elCount]
 )
@@ -147,5 +141,5 @@ gaf_file = Struct(
     "length" / Int32ul,
     "display_scale" / gaf_display_scale,
     "content_scale" / gaf_content_scale,
-    "tags" / tags[3],
+    "tags" / tags[:],
 )
