@@ -23,6 +23,14 @@ gaf_content_scale = Struct(
     "values" / Array(this.count, Float32l),
 )
 
+TextAlignments = Enum(Int8ul,
+    TEXT_ALIGNMENT_LEFT=0,
+    TEXT_ALIGNMENT_RIGHT=1,
+    TEXT_ALIGNMENT_CENTER=2,
+    TEXT_ALIGNMENT_JUSTIFY=3,
+    TEXT_ALIGNMENT_START=4,
+    TEXT_ALIGNMENT_END=5,
+)
 
 tag_defs = Enum(Int16sl,
     TAG_END=0,
@@ -119,6 +127,135 @@ atlas = Struct(
     "elContent" / AtlasElement[this.elCount]
 )
 
+blurFilter = Struct(
+    "blurX" / Float32l,
+    "blurY" / Float32l,
+)
+
+glowFilter = Struct(
+    "color" / Int32ul,
+    "blurX" / Float32l,
+    "blurY" / Float32l,
+    "strength" / Float32l,
+    "inner" / Flag,
+    "knockout" / Flag,
+)
+
+colorMatrixFilter = Struct(
+    "matrix" / Float32l[20]
+)
+
+animationMasks = Struct(
+    "maskLength" / Int32ul,
+    "masks" / Array(this.maskLength, Struct(
+        "objectId" / Int32ul,
+        "regionId" / Int32ul,
+        "type" / Switch(this._.tag_type, {
+            'TAG_DEFINE_ANIMATION_MASKS': 0,
+        }, default=Int8ul),
+    )
+)
+)
+
+animationObjects = Struct(
+    "objectLength" / Int32ul,
+    "objects" / Array(this.objectLength, Struct(
+        "objectId" / Int32ul,
+        "regionId" / Int32ul,
+        "type" / Switch(this._.tag_type, {
+            'TAG_DEFINE_ANIMATION_OBJECTS': 0,
+        }, default=Int8ul),
+    )
+)
+)
+
+animationSequences = Struct(
+    "sequenceLength" / Int32ul,
+    "sequences" / Array(this.sequenceLength, Struct(
+        "sequenceId" / GAFString,
+        "startFrameNo" / Int16ul,
+        "endFrameNo" / Int16ul,
+    )
+)
+)
+
+dropShadowFilter = Struct(
+    "color" / Int32ul,
+    "blurX" / Float32l,
+    "blurY" / Float32l,
+    "angle" / Float32l,
+    "distance" / Float32l,
+    "strength" / Float32l,
+    "inner" / Flag,
+    "knockout" / Flag,
+)
+
+namedParts = Struct(
+    "length" / Int32ul,
+    "parts" / Array(this.length, Struct(
+        "partId" / Int32ul,
+        "name" / GAFString,
+    )
+    )
+)
+
+sound = Struct(
+    "soundCount" / Int16ul,
+    "sounds" / Array(this.soundCount, Struct(
+    "id" / Int16ul,
+    "linkage" / GAFString,
+    "source" / GAFString,
+    "format" / Int8ul,
+    "rate" / Int8ul,
+    "sampleSize" / Int8ul,
+    "stereo" / Flag,
+    "sampleCount" / Int32ul,
+    )
+    )
+)
+
+textFields = Struct(
+    "textFieldCount" / Int32ul,
+    "Fields" / Array(this.textFieldCount, Struct(
+    "textFieldID" / Int32ul,
+    "pivotX" / Float32l,
+    "pivotY" / Float32l,
+    "width" / Float32l,
+    "height" / Float32l,
+    "text" / GAFString,
+    "embedFonts" / Flag,
+    "multiline" / Flag,
+    "wordWrap" / Flag,
+    "hasRestrict" / Flag,
+    "restric" / If(self.hasRestrict, GAFString),
+    "editable" / Flag,
+    "selectable" / Flag,
+    "displayAsPassword" / Flag,
+    "maxChars" / Int32ul,
+    "alignFlag" / Int32ul,
+    "blockIndent" / Int32ul,
+    "bold" / Flag,
+    "bullet" / Flag,
+    "color" / Int32ul,
+    "font" / GAFString,
+    "indent" / Int32ul,
+    "italic" / Flag,
+    "kerning" / Flag,
+    "leading" / Int32ul,
+    "leftMargin" / Int32ul,
+    "letterSpacing" / Float32l,
+    "rightMargin" / Int32ul,
+    "size" / Int32ul,
+    "tabStopCount" / Int32ul,
+    "tabStops" / Int32ul[this.tabStopCount],
+    "target" / GAFString,
+    "underline" / Flag,
+    "url" / GAFString,
+    "align" / TextAlignments,
+    ))
+)
+
+
 tags = Struct(
     "tag_type" / tag_defs,
     #"p" / Probe(),
@@ -130,6 +267,16 @@ tags = Struct(
         "TAG_DEFINE_ATLAS3": atlas,
         "TAG_DEFINE_ATLAS2": atlas,
         "TAG_DEFINE_ATLAS": atlas,
+        "TAG_DEFINE_ANIMATION_MASKS": animationMasks,
+        "TAG_DEFINE_ANIMATION_MASKS2": animationMasks,
+        "TAG_DEFINE_ANIMATION_OBJECTS": animationObjects,
+        "TAG_DEFINE_ANIMATION_OBJECTS2": animationObjects,
+        "TAG_DEFINE_ANIMATION_FRAMES": animationFrames,
+        "TAG_DEFINE_ANIMATION_FRAMES2": animationFrames,
+        "TAG_DEFINE_NAMED_PARTS": namedParts,
+        "TAG_DEFINE_SEQUENCES": sequences,
+        "TAG_DEFINE_SEQUENCES": sounds,
+        "TAG_DEFINE_TEXT_FIELDS": textFields,
         "TAG_END": "die."
       }
     )
