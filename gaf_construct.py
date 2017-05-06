@@ -24,7 +24,7 @@ gaf_content_scale = Struct(
 )
 
 
-tag_type = Enum(Int16sl,
+tag_defs = Enum(Int16sl,
     TAG_END=0,
     TAG_DEFINE_ATLAS=1,
     TAG_DEFINE_ANIMATION_MASKS=2,
@@ -67,49 +67,69 @@ timeline_def = Struct(
                         "")
 )
 
+atl2_extras = Struct(
+    "hasScale9Grid" / Flag, #atl2/3
+    "scale9Grid" / If(this.hasScale9Grid, Rect), #atl2/3
+)
+
+atl3_extras = Struct(
+    # these extras are also in atl2
+    # Embedded() doesn't work inside Switch(), so we have to repeat.
+    "hasScale9Grid" / Flag, #atl2/3
+    "scale9Grid" / If(this.hasScale9Grid, Rect), #atl2/3
+    # atl3 only
+    "elScaleX" / Float32l, #atl3
+    "elScaleY" / Float32l, #atl3
+    "rotation" / Flag, #atl3
+    "linkageName" / GAFString, #atl3
+)
+
 AtlasElement = Struct(
-    "elMark" / Int32ul,
     "pivot" / Point,
     "topLeft" / Point,
-    "elScale" / Float32l, #only on TAG_DEFINE_ATLAS and TAG_DEFINE_ATLAS2
+    "elScale" / Switch(this._._.tag_type, {
+        "TAG_DEFINE_ATLAS": Float32l,
+        "TAG_DEFINE_ATLAS2": Float32l,
+    }, default=None), #only on TAG_DEFINE_ATLAS and TAG_DEFINE_ATLAS2
     "elW" / Float32l,
     "elH" / Float32l,
     "atlID" / Int32ul,
     "elID" / Int32ul,
-    "hasScale9Grid" / Flag, #atl2/3
-    "scale9Grid" / If(this.hasScale9Grid, Rect), #atl2/3
-    #"elScaleX" / Float32l, #atl3
-    #"elScaleY" / Float32l, #atl3
-    #"rotation" / Flag, #atl3
-    #"linkageName" / GAFString, #atl3
+    Embedded(Switch(this._._.tag_type, {
+        "TAG_DEFINE_ATLAS2": atl2_extras,
+        "TAG_DEFINE_ATLAS3": atl3_extras,
+    }, default=None)),
+    "probe" / Probe(),
 )
 
 AtlasSource = Struct(
-    "slid" / Int8ul,
+    "slCount" / Int8ul,
+    Array(this.slCount, Struct(
+        "source" / GAFString,
+        "contentScale" / Float32l,
+    )),
     "p" / Probe(),
-    "source" / GAFString,
-    "p" / ProbeInto(this.source),
-    "contentScale" / Float32l,
-    "elContent" / AtlasElement[:]
 )
 
 AtlasMember = Struct(
-        "almark" / Int8ul,
-        "alid" / Int32ul,
-        "sl_member" / AtlasSource[:]
-        )
+      "alId" / Int32ul,
+      "slMember" / AtlasSource[1:2]
+    )
 
 
 atlas = Struct(
     "displayScale" / Float32l,
-    "alMember" / AtlasMember[:],
+    "alCount" / Int8ul,
+    "alMember" / AtlasMember[this.alCount],
+    "elCount" / Int32ul,
+    "elContent" / AtlasElement[this.elCount]
 )
 
 tags = Struct(
-    "id" / tag_type,
-    "p" / Probe(),
+    "tag_type" / tag_defs,
+    #"p" / Probe(),
     "length" / Int32ul,
-    "detail" / Switch(this.id,
+    "detail" / Switch(this.tag_type,
       {
         "TAG_DEFINE_STAGE": stage_def,
         "TAG_DEFINE_TIMELINE": timeline_def,
@@ -127,5 +147,5 @@ gaf_file = Struct(
     "length" / Int32ul,
     "display_scale" / gaf_display_scale,
     "content_scale" / gaf_content_scale,
-    "tags" / tags[4],
+    "tags" / tags[3],
 )
