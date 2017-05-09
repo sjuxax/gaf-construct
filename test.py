@@ -11,4 +11,3 @@ gaf_contents = open(gaf_path, 'rb').read()
 
 print("GAF File:")
 print(g.gaf_file.parse(gaf_contents))
-print("data_pos from test: 32")

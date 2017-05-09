@@ -23,6 +23,17 @@ gaf_content_scale = Struct(
     "values" / Array(this.count, Float32l),
 )
 
+filter_types = Enum(Int32ul,
+    FILTER_DROP_SHADOW=0,
+    FILTER_BLUR=1,
+    FILTER_GLOW=2,
+    FILTER_BEVEL=3,           # suppressed by GAFConverter
+    FILTER_GRADIENT_GLOW=4,   # suppressed by GAFConverter
+    FILTER_CONVOLUTION=5,     # suppressed by GAFConverter
+    FILTER_COLOR_MATRIX=6,
+    FILTER_GRADIENT_BEVEL=7,  # suppressed by GAFConverter
+                    )
+
 TextAlignments = Enum(Int8ul,
     TEXT_ALIGNMENT_LEFT=0,
     TEXT_ALIGNMENT_RIGHT=1,
@@ -53,7 +64,6 @@ tag_defs = Enum(Int16sl,
 
 
 stage_def = Struct(
-    "probe" / Probe(),
     "fps" /  Int8ul,
     "color" / Int32sl,
     "width" / Int16ul,
@@ -62,7 +72,12 @@ stage_def = Struct(
 
 Rect = Array(4, Float32l)
 Point = Array(2, Float32l)
-GAFString = PascalString(Int16ul, encoding='utf8')
+#GAFString = PascalString(Int16ul, encoding='utf8')
+GAFString = Struct(
+    "bytelength" / Int16ul,
+    "text" / If(this.bytelength > 0, String(this.bytelength, encoding='utf8'))
+)
+GAFMatrix = Array(6, Float32l)
 
 timeline_def = Struct(
     "id" / Int32ul,
@@ -70,9 +85,8 @@ timeline_def = Struct(
     "bounds" / Rect,
     "pivot" / Point,
     "has_linkage" / Flag,
-    "linkage_name" / IfThenElse(this.has_linkage,
-                        GAFString,
-                        "")
+    "linkage_name" / If(this.has_linkage,
+                        GAFString)
 )
 
 atl2_extras = Struct(
@@ -107,7 +121,6 @@ AtlasElement = Struct(
         "TAG_DEFINE_ATLAS2": atl2_extras,
         "TAG_DEFINE_ATLAS3": atl3_extras,
     }, default=None)),
-    "probe" / Probe(),
 )
 
 AtlasSource = Struct(
@@ -150,9 +163,8 @@ animationMasks = Struct(
     "masks" / Array(this.maskLength, Struct(
         "objectId" / Int32ul,
         "regionId" / Int32ul,
-        "type" / Switch(this._.tag_type, {
-            'TAG_DEFINE_ANIMATION_MASKS': 0,
-        }, default=Int8ul),
+        "type" / If(this._._.tag_type != 'TAG_DEFINE_ANIMATION_MASKS',
+                            Int16ul),
     )
 )
 )
@@ -162,9 +174,8 @@ animationObjects = Struct(
     "objects" / Array(this.objectLength, Struct(
         "objectId" / Int32ul,
         "regionId" / Int32ul,
-        "type" / Switch(this._.tag_type, {
-            'TAG_DEFINE_ANIMATION_OBJECTS': 0,
-        }, default=Int8ul),
+        "type" / If(this._._.tag_type != 'TAG_DEFINE_ANIMATION_OBJECTS',
+                            Int16ul,),
     )
 )
 )
@@ -199,7 +210,7 @@ namedParts = Struct(
     )
 )
 
-sound = Struct(
+sounds = Struct(
     "soundCount" / Int16ul,
     "sounds" / Array(this.soundCount, Struct(
     "id" / Int16ul,
@@ -227,7 +238,7 @@ textFields = Struct(
     "multiline" / Flag,
     "wordWrap" / Flag,
     "hasRestrict" / Flag,
-    "restric" / If(self.hasRestrict, GAFString),
+    "restrict" / If(this.hasRestrict, GAFString),
     "editable" / Flag,
     "selectable" / Flag,
     "displayAsPassword" / Flag,
@@ -247,21 +258,15 @@ textFields = Struct(
     "rightMargin" / Int32ul,
     "size" / Int32ul,
     "tabStopCount" / Int32ul,
-    "tabStops" / Int32ul[this.tabStopCount],
+    "tabStops" / If(this.tabStopCount > 0, Array(this.tabStopCount, Int32ul)),
     "target" / GAFString,
     "underline" / Flag,
     "url" / GAFString,
-    "align" / TextAlignments,
+    "Location" / Tell,
     ))
 )
 
-
-tags = Struct(
-    "tag_type" / tag_defs,
-    #"p" / Probe(),
-    "length" / Int32ul,
-    "detail" / Switch(this.tag_type,
-      {
+tag_map = {
         "TAG_DEFINE_STAGE": stage_def,
         "TAG_DEFINE_TIMELINE": timeline_def,
         "TAG_DEFINE_ATLAS3": atlas,
@@ -271,15 +276,113 @@ tags = Struct(
         "TAG_DEFINE_ANIMATION_MASKS2": animationMasks,
         "TAG_DEFINE_ANIMATION_OBJECTS": animationObjects,
         "TAG_DEFINE_ANIMATION_OBJECTS2": animationObjects,
+        "TAG_DEFINE_NAMED_PARTS": namedParts,
+        "TAG_DEFINE_SEQUENCES": animationSequences,
+        "TAG_DEFINE_SOUNDS": sounds,
+        "TAG_DEFINE_TEXT_FIELDS": textFields,
+        "TAG_END": Tell
+      }
+
+tag_root = Struct(
+    "tag_type" / tag_defs,
+    "length" / Int32ul,
+    "location" / Tell,
+    "tag_type_probe" / Probe(),
+    #StopIf(this.tag_type == "TAG_END"),
+    )
+
+frame_subtag = Struct(
+    Embedded(tag_root),
+    "detail" / Switch(this.tag_type, tag_map),
+)
+
+
+def stop_at_tag_end(obj, l, ctx):
+    print("stop at tag end function enter")
+    # print("obj: {}".format(obj))
+    print("obj.tag_type: {}".format(obj.tag_type))
+    if obj.tag_type == 'TAG_END':
+        print("End tag detected; wrapping frame subtag collection.")
+        return True
+
+animationFrames = Struct(
+    "framesCount" / Int32ul,
+    "frames" / Array(this.framesCount, Struct(
+        "frameNum" / Int32ul,
+        "hasChanges" / If(
+            this._._.tag_type != 'TAG_DEFINE_ANIMATION_FRAMES',
+            Flag,
+        ),
+        "hasActions" / If(
+            this._._.tag_type != 'TAG_DEFINE_ANIMATION_FRAMES',
+            Flag,
+        ),
+        "changes" / If(this.hasChanges,
+                       Struct(
+                           "changeCount" / Int32ul,
+
+                           "changeList" / Array(this.changeCount, Struct(
+                               "hasColorTransform" / Flag,
+                               "hasMask" / Flag,
+                               "hasEffect" / Flag,
+                               "stateID" / Int32ul,
+                               "zIndex" / Int32sl,
+                               "alpha" / Float32l,
+                               "matrix" / GAFMatrix,
+                               "colorParams" / If(this.hasColorTransform,
+                                                  Float32l[7]),
+                               "effectParams" / If(this.hasEffect,
+                                                   Struct(
+                                                       "filterCount" / Int8ul,
+                                                       "filterType" / filter_types,
+                                                       "filter" /
+                                                       Switch(this.filterType,
+                                                              {
+                                                                 'FILTER_DROP_SHADOW': dropShadowFilter,
+                                                                 'FILTER_BLUR': blurFilter,
+                                                                 'FILTER_GLOW': glowFilter,
+                                                                 'FILTER_COLOR_MATRIX': colorMatrixFilter,
+                                                              }
+                                                       )
+                                                   )
+                               ),
+                               "maskParams" / If(this.hasMask, Int32ul),
+                           )
+                           )
+                       )
+                    ),
+        "actions" / If(this.hasActions, Struct(
+            "actionCount" / Int32ul,
+            "actionList" / Array(this.actionCount, Struct(
+                "type" / Int32ul,
+                "scope" / GAFString,
+                # "paramsLength" / Int32ul,
+                # "paramsOffset" / Tell,
+                # "paramList" / If(this.paramsLength > 0,
+                "paramList" / Prefixed(Int32ul, GAFString[:],
+                                       includelength=False),
+        "location" / Tell,
+        Probe(),
+
+            )
+            )
+        )
+        ),
+    "endOfFrameMarker" / Tell,
+    # "child_tags" / RepeatUntil(stop_at_tag_end, tags[1]),
+    # "child_tags" / RepeatUntil(stop_at_tag_end, frame_subtag),
+)
+)
+)
+
+frame_map ={
         "TAG_DEFINE_ANIMATION_FRAMES": animationFrames,
         "TAG_DEFINE_ANIMATION_FRAMES2": animationFrames,
-        "TAG_DEFINE_NAMED_PARTS": namedParts,
-        "TAG_DEFINE_SEQUENCES": sequences,
-        "TAG_DEFINE_SEQUENCES": sounds,
-        "TAG_DEFINE_TEXT_FIELDS": textFields,
-        "TAG_END": "die."
-      }
-    )
+}
+
+tags = Struct(
+    Embedded(tag_root),
+    "detail" / Switch(this.tag_type, {**tag_map, **frame_map})
 )
 
 gaf_file = Struct(
@@ -289,4 +392,5 @@ gaf_file = Struct(
     "display_scale" / gaf_display_scale,
     "content_scale" / gaf_content_scale,
     "tags" / tags[:],
+    "final_pos" / Tell,
 )
