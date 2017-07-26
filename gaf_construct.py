@@ -287,7 +287,7 @@ tag_root = Struct(
     "tag_type" / tag_defs,
     "length" / Int32ul,
     "location" / Tell,
-    "tag_type_probe" / Probe(),
+    #"tag_type_probe" / Probe(),
     #StopIf(this.tag_type == "TAG_END"),
     )
 
@@ -362,7 +362,7 @@ animationFrames = Struct(
                 "paramList" / Prefixed(Int32ul, GAFString[:],
                                        includelength=False),
         "location" / Tell,
-        Probe(),
+        #Probe(),
 
             )
             )
